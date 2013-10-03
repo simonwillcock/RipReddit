@@ -1,56 +1,58 @@
-import json, os, urlparse
-from urllib2 import urlopen, Request, HTTPError, URLError
+from urllib2 import urlopen, HTTPError, URLError
+import os, reddit
+from argparse import ArgumentParser
 
-def get_json_data_from_subreddit(subreddit, category, limit="10"):
-	BASE_URL = "http://www.reddit.com/r/"
-	full_url = BASE_URL + subreddit + "/" + category + ".json?limit=" + str(limit)
-	print full_url
-	raw = urlopen(full_url)
-	json_data = json.load(raw)
-	return json_data
+def handle_imgur_url(url):
+	"""
+	Takes Imgur URL and checks if direct link has correct extension. 
+	"""
+	
+	# all static imgur files are jpegs so use .jpg extension
+	if url.endswith('.png'):
+		url = url.replace('.png', '.jpg')
+	else:
+		# if no extension, add .jpg
+		ext = os.path.splitext(os.path.basename(url))[1]
+		if not ext:
+			url += '.jpg'
 
-def get_image_urls_from_json(json_data):
-	img_urls = []
-	for post in json_data['data']['children']:
-		if 'imgur' in post['data']['domain']:
-			img_urls.append(post['data']['url'])
-	return img_urls
+	return [url]
 
-def dlfile(url):
-    # Open the url
-    DOWNLOADS_DIR = './downloads/'
-    try:
-        f = urlopen(url)
-        print "downloading " + url
+def get_urls(url):
+	""" Checks to see if URL is imgur.com and handles, otherwise 
+	simply returns the given url in a list (for planned imgur gallery suppory).
+	"""
 
-        # Open our local file for writing
-        with open(DOWNLOADS_DIR + os.path.basename(url), "wb") as local_file:
-            local_file.write(f.read())
+	urls = []
 
-    #handle errors
-    except HTTPError, e:
-        print "HTTP Error:", e.code, url
-    except URLError, e:
-        print "URL Error:", e.reason, url
+	# is valid imgur.com url
+	if 'imgur.com' in url:
+		urls = handle_imgur_url(url)
+	else:
+		urls = [url]
 
+	return urls
 
-def save_imgs_from_links(img_urls):
-	for url in img_urls:
-		filename = url.split('/')[-1]
-		dlfile(url)
-
-def rip_reddit():
-	sub = raw_input("Name of subreddit (eg. Aww): ")
-	cat = raw_input("Hot, Top, Controversial or New: ")
-	limit = raw_input("Post limit (default = 10): ")
-	json_data = get_json_data_from_subreddit(sub,cat.lower(), limit)
-	img_urls = get_image_urls_from_json(json_data)
-	save_imgs_from_links(img_urls)
-	return True
-def main():
-	success = rip_reddit()
-	if success:
-		print "Success!"
 
 if __name__ == '__main__':
-	main()
+	PARSER = ArgumentParser(description='Downloads images from the specified subreddit.')
+	PARSER.add_argument('subreddit', metavar='<subreddit>', help='Subreddit name.')
+	PARSER.add_argument('dir', metavar='<dest_folder>', help='Directory to put downloaded files in.')
+	ARGS = PARSER.parse_args()
+
+	# Check if directory exists and create it if not.
+	if not os.path.exists(ARGS.dir):
+		os.mkdir(ARGS.dir)
+
+	items = reddit.get_items(ARGS.subreddit)
+
+	total = errors = passed = 0
+
+	for item in items:
+		total += 1
+
+		urls = get_urls(item['url'])
+		
+		for url in urls:
+			print url
+
