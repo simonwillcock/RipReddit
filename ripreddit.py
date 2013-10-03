@@ -33,6 +33,46 @@ def get_urls(url):
 
 	return urls
 
+def download_file(url, filepath):
+	""" Try and download the file from the URL and save to 'filepath'
+
+	It will not download the same file more than once
+	"""
+
+	ext_whitelist = ['image/jpeg', 'image/png', 'image/gif']
+
+	# Check to see if file exists 
+	try:
+		with open(filepath):
+			print "URL (%s) has already been downloaded." % url
+
+	except IOError:
+		response = urlopen(url)
+		info = response.info()
+
+		# Check file type
+		if 'content-type' in info.keys():
+			filetype = info['content-type']
+		elif url.endswith('.jpg') or url.endswith('.jpeg'):
+			filetype = 'image/jpeg'
+		elif url.endswith('.png'):
+			filetype = 'image/png'
+		elif url.endswith('.gif'):
+			filetype = 'image/gif'
+		else:
+			filetype = 'unrecognised'
+
+		if not filetype in ext_whitelist:
+			
+			print "URL (%s) has incorrect file type: %s" % (url, filetype)
+
+		# Save data to file
+		filedata = response.read()
+		with open(filepath, 'wb') as new_file:
+			new_file.write(filedata)
+		
+
+
 
 if __name__ == '__main__':
 	PARSER = ArgumentParser(description='Downloads images from the specified subreddit.')
@@ -46,13 +86,31 @@ if __name__ == '__main__':
 
 	items = reddit.get_items(ARGS.subreddit)
 
-	total = errors = passed = 0
+	total = 0
 
 	for item in items:
 		total += 1
 
 		urls = get_urls(item['url'])
 		
+
 		for url in urls:
-			print url
+			# Set filename and try to download file
+			try:
+				
+				# Remove any HTTP queries from end of url to get clean ext
+				ext = os.path.splitext(url)[1]
+				if '?' in ext:
+					ext = ext[:ext.index('?')]
+
+				filename = '%s%s' % (item['id'], ext)
+				filepath = os.path.join(ARGS.dir, filename)
+
+				download_file(url, filepath)
+
+			except HTTPError as e:
+				print '\tReceived HTTP Error (%s) from %s' % (e.code, url)
+
+			
+			
 
